@@ -4,6 +4,16 @@
 
 This brief captures the recommended post-MVP upgrade direction based on the current codebase audit. It is intentionally shorter than the PRD and is meant to explain what should happen next and why.
 
+## Current Implementation Status (Concise)
+
+Phase 1 core upgrades are now implemented in the codebase:
+- structured findings with severity and evidence
+- executive scorecard metrics for prioritization
+- interactive report filtering/drill-down
+- PDF report export
+
+Remaining work should focus on hardening and edge-case validation before expanding scope.
+
 ## MVP Capabilities Confirmed in the Codebase
 
 The current app already provides:

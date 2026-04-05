@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import streamlit as st
 
-from app.models.analysis import AnalysisRequest, AnalysisResult
+from app.models.analysis import AnalysisRequest, AnalysisResult, Finding, SeverityLevel
 from app.models.documents import ChunkingResult, ExtractedDocument
+from app.services.export import build_analysis_pdf_report
+from app.services.reporting import SEVERITY_ORDER, build_scorecard_metrics
 
 
 def render_results_section(
@@ -20,8 +22,7 @@ def render_results_section(
     st.markdown(
         (
             '<p class="results-copy">Review the consolidated report below. '
-            'The summary and category cards are designed for quick demo scanning, '
-            'while preprocessing details remain available underneath.</p>'
+            'Use the filters to prioritize findings by category and severity.</p>'
         ),
         unsafe_allow_html=True,
     )
@@ -36,7 +37,12 @@ def render_results_section(
             reference_extracted_document=reference_extracted_document,
             primary_chunking_result=primary_chunking_result,
             reference_chunking_result=reference_chunking_result,
+            analysis_result=analysis_result,
         )
+
+    _render_scorecard(analysis_result)
+    _render_export_actions(analysis_request, analysis_result)
+    selected_severities, selected_categories = _render_filters()
 
     top_left, top_right = st.columns(2, gap="large")
     bottom_left, bottom_right = st.columns(2, gap="large")
@@ -44,25 +50,37 @@ def render_results_section(
     with top_left:
         _render_findings_card(
             title="Gaps",
-            items=analysis_result.gaps,
+            category="gaps",
+            findings=analysis_result.gaps,
+            selected_categories=selected_categories,
+            selected_severities=selected_severities,
             empty_message="No material gaps were identified in this run.",
         )
     with top_right:
         _render_findings_card(
             title="Inconsistencies",
-            items=analysis_result.inconsistencies,
+            category="inconsistencies",
+            findings=analysis_result.inconsistencies,
+            selected_categories=selected_categories,
+            selected_severities=selected_severities,
             empty_message="No inconsistencies were identified in this run.",
         )
     with bottom_left:
         _render_findings_card(
             title="Risks",
-            items=analysis_result.risks,
+            category="risks",
+            findings=analysis_result.risks,
+            selected_categories=selected_categories,
+            selected_severities=selected_severities,
             empty_message="No major risks were identified in this run.",
         )
     with bottom_right:
         _render_findings_card(
             title="Recommendations",
-            items=analysis_result.recommendations,
+            category="recommendations",
+            findings=analysis_result.recommendations,
+            selected_categories=selected_categories,
+            selected_severities=selected_severities,
             empty_message="No additional recommendations were generated in this run.",
         )
 
@@ -87,10 +105,12 @@ def _render_context_card(
     reference_extracted_document: ExtractedDocument | None,
     primary_chunking_result: ChunkingResult,
     reference_chunking_result: ChunkingResult | None,
+    analysis_result: AnalysisResult,
 ) -> None:
     warning_count = len(primary_extracted_document.warnings) + len(
         reference_extracted_document.warnings if reference_extracted_document else []
     )
+    metrics = build_scorecard_metrics(analysis_result)
 
     st.markdown('<section class="result-card">', unsafe_allow_html=True)
     st.markdown('<h3 class="result-card-title">Analysis Context</h3>', unsafe_allow_html=True)
@@ -130,6 +150,13 @@ def _render_context_card(
         unsafe_allow_html=True,
     )
 
+    st.caption(
+        "Severity counts: "
+        + " • ".join(
+            f"{severity}: {metrics.severity_counts[severity]}" for severity in SEVERITY_ORDER
+        )
+    )
+
     if warning_count:
         warning_lines = primary_extracted_document.warnings[:]
         if reference_extracted_document:
@@ -159,17 +186,97 @@ def _render_context_card(
     st.markdown("</section>", unsafe_allow_html=True)
 
 
-def _render_findings_card(title: str, items: list[str], empty_message: str) -> None:
+def _render_scorecard(analysis_result: AnalysisResult) -> None:
+    metrics = build_scorecard_metrics(analysis_result)
+
+    st.markdown('<section class="result-card">', unsafe_allow_html=True)
+    st.markdown('<h3 class="result-card-title">Executive Scorecard</h3>', unsafe_allow_html=True)
+
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Total Findings", str(metrics.total_findings))
+    col2.metric("Highest Severity", metrics.highest_severity or "None")
+    col3.metric(
+        "Critical + High",
+        str(metrics.severity_counts["Critical"] + metrics.severity_counts["High"]),
+    )
+    col4.metric("Active Categories", str(metrics.categories_with_findings))
+
+    st.markdown("</section>", unsafe_allow_html=True)
+
+
+def _render_export_actions(analysis_request: AnalysisRequest, analysis_result: AnalysisResult) -> None:
+    st.markdown('<section class="result-card">', unsafe_allow_html=True)
+    st.markdown('<h3 class="result-card-title">Export Report</h3>', unsafe_allow_html=True)
+
+    pdf_bytes = build_analysis_pdf_report(
+        analysis_request=analysis_request,
+        analysis_result=analysis_result,
+    )
+    filename_root = analysis_request.primary_document_name.rsplit(".", 1)[0]
+    st.download_button(
+        label="Download PDF Report",
+        data=pdf_bytes,
+        file_name=f"{filename_root}_analysis_report.pdf",
+        mime="application/pdf",
+        type="primary",
+    )
+
+    st.markdown("</section>", unsafe_allow_html=True)
+
+
+def _render_filters() -> tuple[list[SeverityLevel], list[str]]:
+    st.markdown('<section class="result-card">', unsafe_allow_html=True)
+    st.markdown('<h3 class="result-card-title">Findings Filters</h3>', unsafe_allow_html=True)
+
+    left, right = st.columns(2)
+    with left:
+        selected_severities = st.multiselect(
+            "Severity",
+            options=list(SEVERITY_ORDER),
+            default=list(SEVERITY_ORDER),
+        )
+
+    with right:
+        selected_categories = st.multiselect(
+            "Category",
+            options=["gaps", "inconsistencies", "risks", "recommendations"],
+            default=["gaps", "inconsistencies", "risks", "recommendations"],
+            format_func=lambda item: item.capitalize(),
+        )
+
+    st.markdown("</section>", unsafe_allow_html=True)
+    return selected_severities, selected_categories
+
+
+def _render_findings_card(
+    *,
+    title: str,
+    category: str,
+    findings: list[Finding],
+    selected_categories: list[str],
+    selected_severities: list[SeverityLevel],
+    empty_message: str,
+) -> None:
     st.markdown('<section class="result-card">', unsafe_allow_html=True)
     st.markdown(f'<h3 class="result-card-title">{title}</h3>', unsafe_allow_html=True)
 
-    if not items:
+    if category not in selected_categories:
+        st.markdown('<div class="empty-state">Hidden by category filter.</div>', unsafe_allow_html=True)
+        st.markdown("</section>", unsafe_allow_html=True)
+        return
+
+    visible_findings = [finding for finding in findings if finding.severity in selected_severities]
+
+    if not visible_findings:
         st.markdown(f'<div class="empty-state">{empty_message}</div>', unsafe_allow_html=True)
         st.markdown("</section>", unsafe_allow_html=True)
         return
 
-    for index, item in enumerate(items, start=1):
-        st.markdown(f"{index}. {item}")
+    for index, finding in enumerate(visible_findings, start=1):
+        with st.expander(f"{index}. [{finding.severity}] {finding.title}", expanded=False):
+            st.markdown(f"**Description:** {finding.description}")
+            st.markdown(f"**Evidence:** {finding.evidence}")
+            st.markdown(f"**Recommendation:** {finding.recommendation}")
 
     st.markdown("</section>", unsafe_allow_html=True)
 
