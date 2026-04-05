@@ -1,0 +1,29 @@
+# Environment and secrets
+.env
+.env.*
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python cache and bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Test and coverage artifacts
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Tooling and local workspace metadata
+.qodo/
+.mypy_cache/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
