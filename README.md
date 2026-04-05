@@ -12,6 +12,14 @@ The MVP is complete and the next iteration is now planned as a phased vNext upgr
 - Archived MVP plan: `docs/archive/PLANS_MVP.md`
 - Archived MVP PRD: `docs/archive/PRD_MVP.md`
 
+## Recent vNext Changes
+
+The latest Phase 1 implementation delivered a richer single-report workflow:
+- Findings now use a structured object (`category`, `severity`, `title`, `description`, `evidence`, `recommendation`) with normalization and schema validation.
+- Analyzer prompts/schemas now require evidence-backed findings with severity levels (`Critical`, `High`, `Medium`, `Low`).
+- Results include an executive scorecard, severity/category filters, drill-down finding cards, and PDF export from the report view.
+- Shared reporting/export services and unit tests were added to support this flow.
+
 ## Current Scope
 
 - Streamlit app shell
@@ -36,7 +44,10 @@ The MVP is complete and the next iteration is now planned as a phased vNext upgr
 
 ## Not Implemented Yet
 
-- Additional hardening beyond the MVP baseline
+- Multi-document analysis workflows
+- DOCX support
+- OCR/scanned-PDF extraction support
+- Additional hardening beyond the current baseline
 
 ## Project Structure
 
