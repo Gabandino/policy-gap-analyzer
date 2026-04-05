@@ -1,4 +1,4 @@
-﻿# Policy Gap Analyzer Upgrade Brief
+# Policy Gap Analyzer Upgrade Brief
 
 ## Purpose
 
@@ -94,4 +94,3 @@ The next release should prove:
 - findings can be traced to evidence
 - reports can be shared outside the app
 - the single-report experience is strong enough to support later expansion
-
