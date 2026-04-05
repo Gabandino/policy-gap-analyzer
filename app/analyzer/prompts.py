@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
 
 from app.models.analysis import ChunkAnalysis
 from app.models.documents import ChunkingResult, DocumentChunk
@@ -15,6 +16,9 @@ Do not claim legal certainty.
 Do not invent standards, laws, or controls that are not supported by the text.
 Prefer specific, practical findings over vague commentary.
 If a category has no meaningful findings, return an empty list for that category.
+Each finding object must include: category, severity, title, description, evidence, recommendation.
+Severity must be one of: Critical, High, Medium, Low.
+Evidence should cite chunk id, page context, and short supporting rationale from the provided text.
 """.strip()
 
 
@@ -27,6 +31,9 @@ If reference-policy context is present, use it to strengthen comparisons, not to
 Deduplicate overlapping findings.
 Keep the summary concise and practical.
 Prefer a few strong findings in each category over many repetitive ones.
+Each finding object must include: category, severity, title, description, evidence, recommendation.
+Severity must be one of: Critical, High, Medium, Low.
+Ensure every finding has evidence tied to source chunks.
 Do not claim legal certainty.
 """.strip()
 
@@ -52,7 +59,8 @@ def build_chunk_analysis_user_prompt(
         f"Section heading: {chunk.section_heading or 'n/a'}\n\n"
         f"Primary policy chunk text:\n{chunk.text}"
         f"{reference_block}\n\n"
-        "Return JSON with keys: summary, gaps, inconsistencies, risks, recommendations."
+        "Return JSON with keys: summary, gaps, inconsistencies, risks, recommendations.\n"
+        "Each list must contain finding objects with keys: category, severity, title, description, evidence, recommendation."
     )
 
 
@@ -65,10 +73,10 @@ def build_final_analysis_user_prompt(
         {
             "chunk_id": analysis.chunk_id,
             "summary": analysis.summary,
-            "gaps": analysis.gaps,
-            "inconsistencies": analysis.inconsistencies,
-            "risks": analysis.risks,
-            "recommendations": analysis.recommendations,
+            "gaps": [asdict(finding) for finding in analysis.gaps],
+            "inconsistencies": [asdict(finding) for finding in analysis.inconsistencies],
+            "risks": [asdict(finding) for finding in analysis.risks],
+            "recommendations": [asdict(finding) for finding in analysis.recommendations],
         }
         for analysis in chunk_analyses
     ]
@@ -87,7 +95,8 @@ def build_final_analysis_user_prompt(
         "Chunk findings JSON:\n"
         f"{json.dumps(serialized_chunk_analyses, indent=2)}\n\n"
         "Return JSON with keys: summary, gaps, inconsistencies, risks, recommendations.\n"
-        "The summary should be one concise paragraph. Each list should contain distinct, concrete items."
+        "Each category list must contain finding objects with keys: category, severity, title, description, evidence, recommendation.\n"
+        "The summary should be one concise paragraph. Each list should contain distinct, concrete findings."
     )
 
 
